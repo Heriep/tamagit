@@ -71,19 +71,47 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      final stats = await _githubService.fetchRecentCommits();
+      final stats = await _githubService.fetchRecentCommits(days: 7); // Check last 7 days
       
+      // Filter out commits that have already been used
+      final newCommits = stats.recentCommits
+          .where((commit) => !_settings.usedCommitShas.contains(commit.sha))
+          .toList();
+      
+      final newCommitCount = newCommits.length;
+
       setState(() {
-        if (stats.commitCount > 0) {
-          _pet.feed(stats.commitCount);
-          _statusMessage = '🎉 Fed with ${stats.commitCount} commit${stats.commitCount > 1 ? 's' : ''}!';
+        if (newCommitCount > 0) {
+          _pet.feed(newCommitCount);
+          
+          // Mark these commits as used
+          for (var commit in newCommits) {
+            _settings.usedCommitShas.add(commit.sha);
+          }
+          
+          _statusMessage = '🎉 Fed with $newCommitCount new commit${newCommitCount > 1 ? 's' : ''}!';
+          
+          // Show some commit details
+          if (newCommits.isNotEmpty) {
+            final latestCommit = newCommits.first;
+            final commitMsg = latestCommit.message.length > 50 
+                ? '${latestCommit.message.substring(0, 50)}...'
+                : latestCommit.message;
+            _statusMessage += '\n\nLatest: "$commitMsg"';
+          }
         } else {
-          _statusMessage = '😢 No commits found today. Push some code!';
+          final totalFound = stats.recentCommits.length;
+          if (totalFound > 0) {
+            _statusMessage = '😐 Found $totalFound commit${totalFound > 1 ? 's' : ''}, but already used!';
+          } else {
+            _statusMessage = '😢 No commits found in the last 7 days. Push some code!';
+          }
         }
       });
 
-      // Save updated pet state
+      // Save updated pet state and settings
       await _storageService.savePet(_pet);
+      await _storageService.saveSettings(_settings);
       await _storageService.saveLastUpdate(DateTime.now());
     } catch (e) {
       setState(() {
@@ -182,6 +210,43 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _showResetDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reset Used Commits'),
+        content: const Text(
+          'This will allow you to redeem commits again. Use this for testing or if you want to start fresh.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              setState(() {
+                _settings.usedCommitShas.clear();
+              });
+              await _storageService.saveSettings(_settings);
+              
+              if (mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('✅ Used commits reset!')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+            ),
+            child: const Text('Reset'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStatBar(String label, int value, Color color) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -219,9 +284,36 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: Text('${AppConstants.appName} - ${_pet.name}'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: _showSettingsDialog,
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'settings') {
+                _showSettingsDialog();
+              } else if (value == 'reset') {
+                _showResetDialog();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'settings',
+                child: Row(
+                  children: [
+                    Icon(Icons.settings),
+                    SizedBox(width: 8),
+                    Text('Settings'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'reset',
+                child: Row(
+                  children: [
+                    Icon(Icons.refresh),
+                    SizedBox(width: 8),
+                    Text('Reset Commits'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),

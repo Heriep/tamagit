@@ -4,6 +4,7 @@ class UserSettings {
   bool notificationsEnabled;
   int checkIntervalMinutes;
   DateTime? lastChecked;
+  Set<String> usedCommitShas;
 
   UserSettings({
     this.githubUsername,
@@ -11,7 +12,8 @@ class UserSettings {
     this.notificationsEnabled = true,
     this.checkIntervalMinutes = 60,
     this.lastChecked,
-  });
+    Set<String>? usedCommitShas,
+  }) : usedCommitShas = usedCommitShas ?? {};
 
   bool get isConfigured => githubUsername != null && githubUsername!.isNotEmpty;
 
@@ -22,6 +24,7 @@ class UserSettings {
       'notificationsEnabled': notificationsEnabled,
       'checkIntervalMinutes': checkIntervalMinutes,
       'lastChecked': lastChecked?.toIso8601String(),
+      'usedCommitShas': usedCommitShas.toList(),
     };
   }
 
@@ -34,6 +37,9 @@ class UserSettings {
       lastChecked: json['lastChecked'] != null
           ? DateTime.parse(json['lastChecked'])
           : null,
+      usedCommitShas: json['usedCommitShas'] != null
+          ? Set<String>.from(json['usedCommitShas'])
+          : {},
     );
   }
 }
