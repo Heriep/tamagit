@@ -5,6 +5,8 @@ import '../services/github_service.dart';
 import '../services/storage_service.dart';
 import '../widgets/pet_widget.dart';
 import '../utils/constants.dart';
+import 'statistics_screen.dart';
+import '../models/statistics.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -284,6 +286,19 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: Text('${AppConstants.appName} - ${_pet.name}'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.bar_chart),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => StatisticsScreen(
+                    statistics: Statistics.initial(), // Replace with actual statistics
+                  ),
+                ),
+              );
+            },
+          ),
           PopupMenuButton<String>(
             onSelected: (value) {
               if (value == 'settings') {
