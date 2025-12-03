@@ -20,7 +20,8 @@ class _HomeScreenState extends State<HomeScreen> {
   late UserSettings _settings;
   final GitHubService _githubService = GitHubService();
   final StorageService _storageService = StorageService();
-  
+  late Statistics _statistics;
+
   bool _isLoading = false;
   String _statusMessage = '';
   bool _isInitialized = false;
@@ -29,6 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _initializeApp();
+    _statistics = Statistics.initial();
   }
 
   Future<void> _initializeApp() async {
@@ -86,7 +88,11 @@ class _HomeScreenState extends State<HomeScreen> {
         if (newCommitCount > 0) {
           _pet.feed(newCommitCount);
           
-          // Mark these commits as used
+          // Update statistics with real commits
+          for (int i = 0; i < newCommitCount; i++) {
+            _statistics.incrementCommits();
+          }
+          
           for (var commit in newCommits) {
             _settings.usedCommitShas.add(commit.sha);
           }
@@ -293,7 +299,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => StatisticsScreen(
-                    statistics: Statistics.initial(), // Replace with actual statistics
+                    statistics: _statistics,
                   ),
                 ),
               );
@@ -343,6 +349,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 setState(() {
                   _pet.happiness = (_pet.happiness + 5).clamp(0, 100);
                   _storageService.savePet(_pet);
+                  _statistics.incrementInteractions(); // Track interaction
                 });
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
