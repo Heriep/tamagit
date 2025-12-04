@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class Statistics {
   int totalCommits;
   int currentStreak;
@@ -33,6 +35,34 @@ class Statistics {
         'Sun': 0,
       },
       firstCommitDate: DateTime.now(),
+    );
+  }
+
+  // Add toJson method
+  Map<String, dynamic> toJson() {
+    return {
+      'totalCommits': totalCommits,
+      'currentStreak': currentStreak,
+      'longestStreak': longestStreak,
+      'totalPetInteractions': totalPetInteractions,
+      'commitsByDay': commitsByDay,
+      'firstCommitDate': firstCommitDate.toIso8601String(),
+      'lastCommitDate': lastCommitDate?.toIso8601String(),
+    };
+  }
+
+  // Add fromJson factory
+  factory Statistics.fromJson(Map<String, dynamic> json) {
+    return Statistics(
+      totalCommits: json['totalCommits'] ?? 0,
+      currentStreak: json['currentStreak'] ?? 0,
+      longestStreak: json['longestStreak'] ?? 0,
+      totalPetInteractions: json['totalPetInteractions'] ?? 0,
+      commitsByDay: Map<String, int>.from(json['commitsByDay'] ?? {}),
+      firstCommitDate: DateTime.parse(json['firstCommitDate']),
+      lastCommitDate: json['lastCommitDate'] != null
+          ? DateTime.parse(json['lastCommitDate'])
+          : null,
     );
   }
 

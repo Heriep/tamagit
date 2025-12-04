@@ -3,6 +3,7 @@ import '../models/pet.dart';
 import '../models/user_settings.dart';
 import '../services/github_service.dart';
 import '../services/storage_service.dart';
+import '../services/statistics_service.dart';
 import '../widgets/pet_widget.dart';
 import '../utils/constants.dart';
 import 'statistics_screen.dart';
@@ -20,6 +21,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late UserSettings _settings;
   final GitHubService _githubService = GitHubService();
   final StorageService _storageService = StorageService();
+  final StatisticsService _statisticsService = StatisticsService();
   late Statistics _statistics;
 
   bool _isLoading = false;
@@ -30,7 +32,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _initializeApp();
-    _statistics = Statistics.initial();
   }
 
   Future<void> _initializeApp() async {
@@ -40,6 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Load saved data
     _settings = await _storageService.loadSettings();
+    _statistics = await _statisticsService.loadStatistics();
     Pet? savedPet = await _storageService.loadPet();
 
     if (savedPet != null) {
@@ -117,9 +119,10 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       });
 
-      // Save updated pet state and settings
+      // Save updated pet state, settings, and statistics
       await _storageService.savePet(_pet);
       await _storageService.saveSettings(_settings);
+      await _statisticsService.saveStatistics(_statistics);
       await _storageService.saveLastUpdate(DateTime.now());
     } catch (e) {
       setState(() {
@@ -345,12 +348,13 @@ class _HomeScreenState extends State<HomeScreen> {
             // Pet Display
             PetWidget(
               pet: _pet,
-              onTap: () {
+              onTap: () async {
                 setState(() {
                   _pet.happiness = (_pet.happiness + 5).clamp(0, 100);
-                  _storageService.savePet(_pet);
                   _statistics.incrementInteractions(); // Track interaction
                 });
+                await _storageService.savePet(_pet);
+                await _statisticsService.saveStatistics(_statistics);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('🥰 Pet petted!'),
