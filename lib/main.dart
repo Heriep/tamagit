@@ -25,6 +25,7 @@ class MyApp extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'TamaGit',
+        debugShowCheckedModeBanner: false,
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
           useMaterial3: true,

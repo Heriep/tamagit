@@ -19,6 +19,7 @@ class _PetWidgetState extends State<PetWidget> with SingleTickerProviderStateMix
   ui.Image? _customAquatan;
   int _currentFrame = 0;
   late AnimationController _animationController;
+  late Animation<int> _frameAnimation;
   
   @override
   void initState() {
@@ -28,13 +29,22 @@ class _PetWidgetState extends State<PetWidget> with SingleTickerProviderStateMix
   }
 
   void _setupAnimation() {
+    // Duration for complete animation cycle (all 4 frames)
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: GameConstants.baseAnimationInterval),
+      duration: const Duration(milliseconds: GameConstants.baseAnimationInterval * 4),
+    );
+
+    // Create stepped animation that changes frame only at specific points
+    _frameAnimation = IntTween(begin: 0, end: 3).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.linear,
+      ),
     )..addListener(() {
-        if (mounted) {
+        if (mounted && _frameAnimation.value != _currentFrame) {
           setState(() {
-            _currentFrame = (_currentFrame + 1) % 4; // 4 frames per animation
+            _currentFrame = _frameAnimation.value;
           });
         }
       });
@@ -58,9 +68,9 @@ class _PetWidgetState extends State<PetWidget> with SingleTickerProviderStateMix
       final stageFactor = state.growthStage.animationSpeed;
       
       final duration = Duration(
-        milliseconds: (GameConstants.baseAnimationInterval / (energyFactor * stageFactor))
+        milliseconds: ((GameConstants.baseAnimationInterval * 4) / (energyFactor * stageFactor))
             .round()
-            .clamp(GameConstants.minAnimationInterval, GameConstants.maxAnimationInterval),
+            .clamp(GameConstants.minAnimationInterval * 4, GameConstants.maxAnimationInterval * 4),
       );
       
       if (_animationController.duration != duration) {
