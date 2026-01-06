@@ -28,10 +28,10 @@ enum AquatanGrowthStage {
 }
 
 enum AquatanPose {
-  idle(row: 0),
-  walking(row: 1),
-  jumping(row: 2),
-  celebrating(row: 3);
+  walkingFront(row: 0),
+  walkingLeft(row: 1),
+  walkingRight(row: 2),
+  walkingBack(row: 3);
 
   const AquatanPose({required this.row});
 
@@ -74,7 +74,7 @@ class AquatanState {
       age: 0,
       mood: AquatanMood.happy,
       growthStage: AquatanGrowthStage.egg,
-      currentPose: AquatanPose.idle,
+      currentPose: AquatanPose.walkingFront,
       colors: colors,
       lastFed: now,
       lastPlayed: now,
@@ -150,7 +150,7 @@ class AquatanState {
       ),
       currentPose: AquatanPose.values.firstWhere(
         (e) => e.name == json['currentPose'],
-        orElse: () => AquatanPose.idle,
+        orElse: () => AquatanPose.walkingFront,
       ),
       colors: (json['colors'] as Map<String, dynamic>?)?.map(
         (k, v) => MapEntry(k, Color(v as int)),

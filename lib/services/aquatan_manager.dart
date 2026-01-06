@@ -31,7 +31,7 @@ class AquatanManager {
     // Decay timer - runs every hour
     _decayTimer = Timer.periodic(const Duration(hours: 1), (_) => _applyDecay());
     
-    // Pose animation timer
+    // Pose animation timer - changes walking direction
     _schedulePoseUpdate();
     
     // Aging timer - runs daily
@@ -64,8 +64,9 @@ class AquatanManager {
     final energyFactor = (_state.energy / 100).clamp(0.1, 1.0);
     final stageFactor = _state.growthStage.animationSpeed.clamp(0.1, 10.0);
     
-    final interval = (GameConstants.baseAnimationInterval / (energyFactor * stageFactor)).round();
-    return interval.clamp(GameConstants.minAnimationInterval, GameConstants.maxAnimationInterval);
+    // More frequent direction changes when energetic
+    final interval = (GameConstants.baseAnimationInterval * 8 / (energyFactor * stageFactor)).round();
+    return interval.clamp(1000, 5000); // Change direction every 1-5 seconds
   }
 
   void _updatePose() {
@@ -78,21 +79,31 @@ class AquatanManager {
   AquatanPose _selectPoseForMood(AquatanMood mood) {
     switch (mood) {
       case AquatanMood.sleeping:
-      case AquatanMood.tired:
       case AquatanMood.sick:
-        return AquatanPose.idle;
+        // Stay facing front when sleeping/sick
+        return AquatanPose.walkingFront;
         
-      case AquatanMood.excited:
-        return _random.nextBool() ? AquatanPose.jumping : AquatanPose.celebrating;
+      case AquatanMood.tired:
+        // Mostly stay still, occasionally turn
+        return _random.nextDouble() < 0.8 
+            ? AquatanPose.walkingFront 
+            : AquatanPose.values[_random.nextInt(AquatanPose.values.length)];
         
       case AquatanMood.sad:
-        return _random.nextDouble() < 0.3 ? AquatanPose.walking : AquatanPose.idle;
+        // Slow pacing left and right
+        return _random.nextBool() ? AquatanPose.walkingLeft : AquatanPose.walkingRight;
+        
+      case AquatanMood.excited:
+        // Rapid random movement in all directions
+        return AquatanPose.values[_random.nextInt(AquatanPose.values.length)];
         
       case AquatanMood.happy:
+        // Normal wandering behavior
         final rand = _random.nextDouble();
-        if (rand < 0.5) return AquatanPose.idle;
-        if (rand < 0.8) return AquatanPose.walking;
-        return AquatanPose.jumping;
+        if (rand < 0.4) return AquatanPose.walkingFront;
+        if (rand < 0.6) return AquatanPose.walkingBack;
+        if (rand < 0.8) return AquatanPose.walkingLeft;
+        return AquatanPose.walkingRight;
     }
   }
 
@@ -118,6 +129,7 @@ class AquatanManager {
     _updateState(_state.copyWith(
       stats: newStats,
       lastFed: DateTime.now(),
+      currentPose: AquatanPose.walkingFront, // Face front when being fed
     ));
   }
 
@@ -126,7 +138,7 @@ class AquatanManager {
     _updateState(_state.copyWith(
       stats: newStats,
       lastPlayed: DateTime.now(),
-      currentPose: AquatanPose.celebrating,
+      currentPose: AquatanPose.walkingBack, // Jump around happily
     ));
   }
 
@@ -136,7 +148,7 @@ class AquatanManager {
       stats: newStats,
       lastRested: DateTime.now(),
       mood: AquatanMood.sleeping,
-      currentPose: AquatanPose.idle,
+      currentPose: AquatanPose.walkingFront, // Face front while sleeping
     ));
   }
 
@@ -145,7 +157,7 @@ class AquatanManager {
     _updateState(_state.copyWith(
       stats: newStats,
       totalCommits: _state.totalCommits + commitCount,
-      currentPose: AquatanPose.celebrating,
+      currentPose: AquatanPose.walkingFront, // Face front when receiving commits
     ));
   }
 
@@ -161,7 +173,12 @@ class AquatanManager {
     ));
   }
 
-  // Debug method to force state override
+  // Make _updateState accessible for debug purposes
+  void debugUpdateState(AquatanState newState) {
+    _updateState(newState);
+  }
+
+  // Debug method to force state override (bypasses recalculation)
   void debugSetState(AquatanState newState) {
     _state = newState;
     onStateChanged(_state);
