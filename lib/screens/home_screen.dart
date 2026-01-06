@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import '../models/pet.dart';
+import 'package:provider/provider.dart';
 import '../models/user_settings.dart';
 import '../services/github_service.dart';
 import '../services/storage_service.dart';
 import '../services/statistics_service.dart';
 import '../widgets/pet_widget.dart';
+import '../providers/pet_provider.dart';
 import '../utils/constants.dart';
 import 'statistics_screen.dart';
 import '../models/statistics.dart';
@@ -17,7 +18,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  late Pet _pet;
   late UserSettings _settings;
   final GitHubService _githubService = GitHubService();
   final StorageService _storageService = StorageService();
@@ -35,34 +35,46 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _initializeApp() async {
-    setState(() {
-      _isLoading = true;
-    });
+    try {
+      setState(() {
+        _isLoading = true;
+      });
 
-    // Load saved data
-    _settings = await _storageService.loadSettings();
-    _statistics = await _statisticsService.loadStatistics();
-    Pet? savedPet = await _storageService.loadPet();
+      // Load saved data
+      _settings = await _storageService.loadSettings();
+      _statistics = await _statisticsService.loadStatistics();
 
-    if (savedPet != null) {
-      _pet = savedPet;
-      _pet.decay(); // Apply decay since last session
-    } else {
-      _pet = Pet();
+      // Configure GitHub service if configured
+      if (_settings.isConfigured) {
+        _githubService.setCredentials(_settings.githubUsername!, _settings.githubToken);
+        
+        // Initialize pet provider with username
+        if (mounted) {
+          await context.read<PetProvider>().initialize(_settings.githubUsername!);
+        }
+      } else {
+        // Initialize with a default username if not configured
+        if (mounted) {
+          await context.read<PetProvider>().initialize('guest');
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isInitialized = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error initializing app: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isInitialized = true;
+          _statusMessage = 'Error initializing app. Please configure settings.';
+        });
+      }
     }
-
-    // Configure GitHub service
-    if (_settings.isConfigured) {
-      _githubService.setCredentials(_settings.githubUsername!, _settings.githubToken);
-    }
-
-    setState(() {
-      _isLoading = false;
-      _isInitialized = true;
-    });
-
-    // Auto-save pet state
-    await _storageService.savePet(_pet);
   }
 
   Future<void> _fetchAndFeed() async {
@@ -77,31 +89,30 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      final stats = await _githubService.fetchRecentCommits(days: 7); // Check last 7 days
+      final stats = await _githubService.fetchRecentCommits(days: 7);
       
-      // Filter out commits that have already been used
       final newCommits = stats.recentCommits
           .where((commit) => !_settings.usedCommitShas.contains(commit.sha))
           .toList();
       
       final newCommitCount = newCommits.length;
 
-      setState(() {
-        if (newCommitCount > 0) {
-          _pet.feed(newCommitCount);
-          
-          // Update statistics with real commits
-          for (int i = 0; i < newCommitCount; i++) {
-            _statistics.incrementCommits();
-          }
-          
-          for (var commit in newCommits) {
-            _settings.usedCommitShas.add(commit.sha);
-          }
-          
+      if (newCommitCount > 0) {
+        // Update pet through provider
+        context.read<PetProvider>().onCommit(newCommitCount);
+        
+        // Update statistics
+        for (int i = 0; i < newCommitCount; i++) {
+          _statistics.incrementCommits();
+        }
+        
+        for (var commit in newCommits) {
+          _settings.usedCommitShas.add(commit.sha);
+        }
+        
+        setState(() {
           _statusMessage = '🎉 Fed with $newCommitCount new commit${newCommitCount > 1 ? 's' : ''}!';
           
-          // Show some commit details
           if (newCommits.isNotEmpty) {
             final latestCommit = newCommits.first;
             final commitMsg = latestCommit.message.length > 50 
@@ -109,18 +120,18 @@ class _HomeScreenState extends State<HomeScreen> {
                 : latestCommit.message;
             _statusMessage += '\n\nLatest: "$commitMsg"';
           }
-        } else {
-          final totalFound = stats.recentCommits.length;
+        });
+      } else {
+        final totalFound = stats.recentCommits.length;
+        setState(() {
           if (totalFound > 0) {
             _statusMessage = '😐 Found $totalFound commit${totalFound > 1 ? 's' : ''}, but already used!';
           } else {
             _statusMessage = '😢 No commits found in the last 7 days. Push some code!';
           }
-        }
-      });
+        });
+      }
 
-      // Save updated pet state, settings, and statistics
-      await _storageService.savePet(_pet);
       await _storageService.saveSettings(_settings);
       await _statisticsService.saveStatistics(_statistics);
       await _storageService.saveLastUpdate(DateTime.now());
@@ -206,7 +217,9 @@ class _HomeScreenState extends State<HomeScreen> {
               _githubService.setCredentials(username, token.isEmpty ? null : token);
               await _storageService.saveSettings(_settings);
 
+              // Re-initialize pet with new username
               if (mounted) {
+                await context.read<PetProvider>().initialize(username);
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('✅ Settings saved!')),
@@ -258,42 +271,31 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildStatBar(String label, int value, Color color) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-            Text('$value%'),
-          ],
-        ),
-        const SizedBox(height: 4),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: LinearProgressIndicator(
-            value: value / 100,
-            backgroundColor: Colors.grey[300],
-            valueColor: AlwaysStoppedAnimation<Color>(color),
-            minHeight: AppConstants.statBarHeight,
-          ),
-        ),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     if (!_isInitialized) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Loading TamaGit...'),
+            ],
+          ),
+        ),
       );
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('${AppConstants.appName} - ${_pet.name}'),
+        title: Consumer<PetProvider>(
+          builder: (context, petProvider, child) {
+            final state = petProvider.state;
+            return Text('${AppConstants.appName}${state != null ? ' - Stage: ${state.growthStage.name}' : ''}');
+          },
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.bar_chart),
@@ -346,62 +348,55 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           children: [
             // Pet Display
-            PetWidget(
-              pet: _pet,
-              onTap: () async {
-                setState(() {
-                  _pet.happiness = (_pet.happiness + 5).clamp(0, 100);
-                  _statistics.incrementInteractions(); // Track interaction
-                });
-                await _storageService.savePet(_pet);
-                await _statisticsService.saveStatistics(_statistics);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('🥰 Pet petted!'),
-                    duration: Duration(seconds: 1),
-                  ),
-                );
-              },
-            ),
+            const PetWidget(),
 
             const SizedBox(height: 24),
 
             // Pet Info
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  children: [
-                    Text(
-                      'Stage: ${_pet.stage.name.toUpperCase()}',
-                      style: Theme.of(context).textTheme.titleLarge,
+            Consumer<PetProvider>(
+              builder: (context, petProvider, child) {
+                final state = petProvider.state;
+                if (state == null) {
+                  return const Card(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Text('Configure GitHub to get started'),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Total Commits: ${_pet.totalCommits}',
-                      style: Theme.of(context).textTheme.bodyLarge,
+                  );
+                }
+
+                return Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      children: [
+                        Text(
+                          'Stage: ${state.growthStage.name.toUpperCase()}',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Total Commits: ${state.totalCommits}',
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Age: ${state.age} days',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Streak: ${state.commitStreak} days',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: state.commitStreak > 7 ? Colors.green : null,
+                            fontWeight: state.commitStreak > 7 ? FontWeight.bold : null,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Stats
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  children: [
-                    _buildStatBar('Hunger', _pet.hunger, AppConstants.happyColor),
-                    const SizedBox(height: 12),
-                    _buildStatBar('Happiness', _pet.happiness, Colors.amber),
-                    const SizedBox(height: 12),
-                    _buildStatBar('Energy', _pet.energy, Colors.blue),
-                  ],
-                ),
-              ),
+                  ),
+                );
+              },
             ),
 
             const SizedBox(height: 16),

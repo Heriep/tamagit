@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/pet.dart';
 import '../models/user_settings.dart';
+import '../models/aquatan.dart';
 
 class StorageService {
   static const String _petKey = 'pet_data';
@@ -77,6 +78,23 @@ class StorageService {
     } catch (e) {
       return null;
     }
+  }
+
+  // Save Aquatan state
+  Future<void> saveAquatanState(AquatanState state) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('aquatan_state', jsonEncode(state.toJson()));
+  }
+
+  // Load Aquatan state
+  Future<AquatanState?> loadAquatanState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final stateJson = prefs.getString('aquatan_state');
+    
+    if (stateJson != null) {
+      return AquatanState.fromJson(jsonDecode(stateJson));
+    }
+    return null;
   }
 
   // Clear all data (for reset)
