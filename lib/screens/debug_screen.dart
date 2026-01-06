@@ -85,20 +85,43 @@ class _DebugScreenState extends State<DebugScreen> {
   void _setPreset(String preset) {
     setState(() {
       switch (preset) {
-        case 'sick':
-          _health = 15;
-          _happiness = 30;
-          _energy = 20;
+        // Mood presets
+        case 'happy':
+          _health = 80;
+          _happiness = 85;
+          _energy = 75;
+          break;
+        case 'excited':
+          _health = 100;
+          _happiness = 100;
+          _energy = 100;
+          break;
+        case 'sad':
+          _health = 60;
+          _happiness = 25;
+          _energy = 50;
           break;
         case 'tired':
           _health = 50;
           _happiness = 50;
           _energy = 10;
           break;
-        case 'excited':
-          _health = 100;
-          _happiness = 100;
-          _energy = 100;
+        case 'sick':
+          _health = 15;
+          _happiness = 30;
+          _energy = 20;
+          break;
+        case 'sleeping':
+          _health = 70;
+          _happiness = 60;
+          _energy = 5;
+          break;
+        
+        // Growth stage presets
+        case 'egg':
+          _age = 0;
+          _totalCommits = 0;
+          _commitStreak = 0;
           break;
         case 'baby':
           _age = 5;
@@ -188,10 +211,22 @@ class _DebugScreenState extends State<DebugScreen> {
               runSpacing: 8,
               children: [
                 ElevatedButton.icon(
-                  onPressed: () => _setPreset('sick'),
-                  icon: const Icon(Icons.sick),
-                  label: const Text('Sick'),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red[100]),
+                  onPressed: () => _setPreset('happy'),
+                  icon: const Icon(Icons.sentiment_very_satisfied),
+                  label: const Text('Happy'),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green[100]),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () => _setPreset('excited'),
+                  icon: const Icon(Icons.celebration),
+                  label: const Text('Excited'),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.orange[100]),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () => _setPreset('sad'),
+                  icon: const Icon(Icons.sentiment_dissatisfied),
+                  label: const Text('Sad'),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.blue[100]),
                 ),
                 ElevatedButton.icon(
                   onPressed: () => _setPreset('tired'),
@@ -200,10 +235,16 @@ class _DebugScreenState extends State<DebugScreen> {
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.grey[300]),
                 ),
                 ElevatedButton.icon(
-                  onPressed: () => _setPreset('excited'),
-                  icon: const Icon(Icons.celebration),
-                  label: const Text('Excited'),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green[100]),
+                  onPressed: () => _setPreset('sick'),
+                  icon: const Icon(Icons.sick),
+                  label: const Text('Sick'),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red[100]),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () => _setPreset('sleeping'),
+                  icon: const Icon(Icons.bedtime),
+                  label: const Text('Sleeping'),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo[100]),
                 ),
               ],
             ),
@@ -220,6 +261,12 @@ class _DebugScreenState extends State<DebugScreen> {
               spacing: 8,
               runSpacing: 8,
               children: [
+                ElevatedButton.icon(
+                  onPressed: () => _setPreset('egg'),
+                  icon: const Icon(Icons.egg),
+                  label: const Text('Egg'),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.grey[200]),
+                ),
                 ElevatedButton.icon(
                   onPressed: () => _setPreset('baby'),
                   icon: const Icon(Icons.child_care),
