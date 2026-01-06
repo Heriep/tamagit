@@ -633,26 +633,33 @@ class _HomeScreenState extends State<HomeScreen> {
     IconData icon, {
     bool highlight = false,
   }) {
-    return Chip(
-      avatar: Icon(icon, size: 16),
-      label: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(fontSize: 10),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: highlight ? Colors.orange : null,
+    return Flexible(
+      child: Chip(
+        avatar: Icon(icon, size: 14),
+        label: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(fontSize: 9),
+              overflow: TextOverflow.ellipsis,
             ),
-          ),
-        ],
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: highlight ? Colors.orange : null,
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
+          ],
+        ),
+        backgroundColor: highlight ? Colors.orange[50] : null,
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
-      backgroundColor: highlight ? Colors.orange[50] : null,
     );
   }
 }
