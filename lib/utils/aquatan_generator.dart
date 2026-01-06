@@ -1,10 +1,9 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'dart:convert';
-import 'package:crypto/crypto.dart';
 
 class AquatanGenerator {
+  // Exact colors from the original JavaScript aquagen.js
   static const Map<String, List<int>> tmplColors = {
     '背景': [190, 179, 145],
     '帽子1': [6, 72, 39],
@@ -30,25 +29,18 @@ class AquatanGenerator {
     '胴体6': [103, 106, 109],
   };
 
-  /// Generate deterministic colors from username hash
+  /// Generate default color map (keeps original colors)
   static Map<String, Color> generateColorsFromUsername(String username) {
-    final hash = sha256.convert(utf8.encode(username)).toString();
+    // Return original colors without any modification
     final colors = <String, Color>{};
     
-    int hashIndex = 0;
     for (final entry in tmplColors.entries) {
-      // Use 2 characters from hash for each RGB component (6 chars total per color)
-      // Hash is 64 chars long, wrap around safely
-      final rStart = (hashIndex) % 62;
-      final gStart = (hashIndex + 2) % 62;
-      final bStart = (hashIndex + 4) % 62;
-      
-      final r = int.parse(hash.substring(rStart, rStart + 2), radix: 16);
-      final g = int.parse(hash.substring(gStart, gStart + 2), radix: 16);
-      final b = int.parse(hash.substring(bStart, bStart + 2), radix: 16);
-      
-      colors[entry.key] = Color.fromARGB(255, r, g, b);
-      hashIndex = (hashIndex + 6) % 62; // Move to next position, wrap around
+      colors[entry.key] = Color.fromARGB(
+        255,
+        entry.value[0],
+        entry.value[1],
+        entry.value[2],
+      );
     }
     
     return colors;
@@ -69,32 +61,20 @@ class AquatanGenerator {
     final Uint8List pixels = byteData.buffer.asUint8List();
     final Uint8List newPixels = Uint8List.fromList(pixels);
 
-    final replacementTable = <int, List<int>>{};
-    for (final entry in tmplColors.entries) {
-      final key = _toHex(entry.value);
+    // Only make background transparent if requested
+    if (transparentBackground) {
+      final bgKey = _toHex(tmplColors['背景']!);
       
-      if (entry.key == '背景' && transparentBackground) {
-        replacementTable[key] = [255, 255, 255, 0];
-      } else {
-        final color = colorMap[entry.key];
-        if (color != null) {
-          replacementTable[key] = [color.red, color.green, color.blue, color.alpha];
+      for (int i = 0; i < newPixels.length; i += 4) {
+        final r = newPixels[i];
+        final g = newPixels[i + 1];
+        final b = newPixels[i + 2];
+        final key = _toHex([r, g, b]);
+
+        // Make background transparent
+        if (key == bgKey) {
+          newPixels[i + 3] = 0; // Set alpha to 0
         }
-      }
-    }
-
-    for (int i = 0; i < newPixels.length; i += 4) {
-      final r = newPixels[i];
-      final g = newPixels[i + 1];
-      final b = newPixels[i + 2];
-      final key = _toHex([r, g, b]);
-
-      if (replacementTable.containsKey(key)) {
-        final replacement = replacementTable[key]!;
-        newPixels[i] = replacement[0];
-        newPixels[i + 1] = replacement[1];
-        newPixels[i + 2] = replacement[2];
-        newPixels[i + 3] = replacement[3];
       }
     }
 
