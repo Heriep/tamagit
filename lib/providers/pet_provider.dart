@@ -89,6 +89,15 @@ class PetProvider extends ChangeNotifier {
     }
   }
 
+  // Debug method to manually override state
+  void debugUpdateState(AquatanState newState) async {
+    if (_aquatanManager != null) {
+      _aquatanManager!.debugSetState(newState);
+      await _storageService.saveAquatanState(newState);
+      notifyListeners();
+    }
+  }
+
   @override
   void dispose() {
     _aquatanManager?.dispose();

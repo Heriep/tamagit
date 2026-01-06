@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import '../models/aquatan.dart';
-import '../services/stat_calculator.dart';
+import 'stat_calculator.dart';
 import '../utils/game_constants.dart';
 
 class AquatanManager {
@@ -159,5 +159,11 @@ class AquatanManager {
       stats: newStats,
       commitStreak: streak,
     ));
+  }
+
+  // Debug method to force state override
+  void debugSetState(AquatanState newState) {
+    _state = newState;
+    onStateChanged(_state);
   }
 }

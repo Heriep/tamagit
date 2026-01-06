@@ -8,6 +8,7 @@ import '../providers/pet_provider.dart';
 import '../utils/game_constants.dart';
 import '../services/stat_calculator.dart';
 import 'statistics_screen.dart';
+import 'debug_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -343,6 +344,16 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.bug_report),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const DebugScreen()),
+              );
+            },
+            tooltip: 'Debug Controls',
+          ),
           IconButton(
             icon: const Icon(Icons.bar_chart),
             onPressed: _navigateToStatistics,
