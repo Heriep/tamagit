@@ -6,7 +6,7 @@ import 'dart:typed_data';
 import '../providers/pet_provider.dart';
 import '../utils/aquatan_generator.dart';
 import '../models/aquatan.dart';
-import '../services/aquatan_manager.dart';
+import '../utils/game_constants.dart';
 
 class PetWidget extends StatefulWidget {
   const PetWidget({Key? key}) : super(key: key);
@@ -18,52 +18,89 @@ class PetWidget extends StatefulWidget {
 class _PetWidgetState extends State<PetWidget> with SingleTickerProviderStateMixin {
   ui.Image? _customAquatan;
   int _currentFrame = 0;
-  late AnimationController _controller;
-
+  late AnimationController _animationController;
+  
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
+    _setupAnimation();
+    _generateCustomPet();
+  }
+
+  void _setupAnimation() {
+    _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 250),
+      duration: const Duration(milliseconds: GameConstants.baseAnimationInterval),
     )..addListener(() {
-        setState(() {
-          _currentFrame = (_currentFrame + 1) % 4;
-        });
+        if (mounted) {
+          setState(() {
+            _currentFrame = (_currentFrame + 1) % 4; // 4 frames per animation
+          });
+        }
       });
     
-    _generateCustomPet();
+    _animationController.repeat();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _updateAnimationSpeed();
+  }
+
+  void _updateAnimationSpeed() {
+    final petProvider = context.watch<PetProvider>();
+    final state = petProvider.state;
+    
+    if (state != null) {
+      // Adjust animation speed based on energy and growth stage
+      final energyFactor = (state.energy / 100).clamp(0.3, 1.0);
+      final stageFactor = state.growthStage.animationSpeed;
+      
+      final duration = Duration(
+        milliseconds: (GameConstants.baseAnimationInterval / (energyFactor * stageFactor))
+            .round()
+            .clamp(GameConstants.minAnimationInterval, GameConstants.maxAnimationInterval),
+      );
+      
+      if (_animationController.duration != duration) {
+        _animationController.duration = duration;
+      }
+    }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
   Future<void> _generateCustomPet() async {
-    final petProvider = context.read<PetProvider>();
-    final state = petProvider.state;
-    
-    if (state == null) return;
+    try {
+      final petProvider = context.read<PetProvider>();
+      final state = petProvider.state;
+      
+      if (state == null) return;
 
-    final ByteData data = await rootBundle.load('assets/images/aquatan_base.png');
-    final Uint8List bytes = data.buffer.asUint8List();
-    final ui.Codec codec = await ui.instantiateImageCodec(bytes);
-    final ui.FrameInfo frameInfo = await codec.getNextFrame();
-    final ui.Image baseImage = frameInfo.image;
+      final ByteData data = await rootBundle.load('assets/images/aquatan_base.png');
+      final Uint8List bytes = data.buffer.asUint8List();
+      final ui.Codec codec = await ui.instantiateImageCodec(bytes);
+      final ui.FrameInfo frameInfo = await codec.getNextFrame();
+      final ui.Image baseImage = frameInfo.image;
 
-    final customImage = await AquatanGenerator.recolorAquatan(
-      baseImage,
-      state.colors,
-      transparentBackground: true,
-    );
+      final customImage = await AquatanGenerator.recolorAquatan(
+        baseImage,
+        state.colors,
+        transparentBackground: true,
+      );
 
-    if (mounted) {
-      setState(() {
-        _customAquatan = customImage;
-      });
-      _controller.repeat();
+      if (mounted) {
+        setState(() {
+          _customAquatan = customImage;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error generating custom pet: $e');
     }
   }
 
@@ -71,151 +108,240 @@ class _PetWidgetState extends State<PetWidget> with SingleTickerProviderStateMix
   Widget build(BuildContext context) {
     return Consumer<PetProvider>(
       builder: (context, petProvider, child) {
-        final manager = petProvider.aquatanManager;
+        final state = petProvider.state;
         
-        if (manager == null || _customAquatan == null) {
-          return const Center(child: CircularProgressIndicator());
+        if (state == null || _customAquatan == null) {
+          return const SizedBox(
+            height: 200,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Hatching your Aquatan...'),
+                ],
+              ),
+            ),
+          );
         }
 
-        final state = manager.state;
-        final size = manager.displaySize * 64; // Base size 64
+        final displaySize = GameConstants.basePetSize * state.growthStage.size;
 
-        return Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Status message
-            Container(
-              padding: const EdgeInsets.all(12),
-              margin: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.9),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.blue[50]!,
+                Colors.white,
+              ],
+            ),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(manager.moodIcon, size: 24),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      manager.statusMessage,
-                      style: const TextStyle(fontSize: 14),
-                      textAlign: TextAlign.center,
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Growth stage badge
+              _buildGrowthStageBadge(state.growthStage),
+              
+              const SizedBox(height: 16),
+
+              // Aquatan sprite with animation
+              Container(
+                width: displaySize + 32,
+                height: displaySize + 32,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.5),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: _getMoodColor(state.mood).withOpacity(0.3),
+                    width: 3,
+                  ),
+                ),
+                child: Center(
+                  child: SizedBox(
+                    width: displaySize,
+                    height: displaySize,
+                    child: CustomPaint(
+                      painter: AquatanPainter(
+                        image: _customAquatan!,
+                        frame: _currentFrame,
+                        pose: state.currentPose,
+                      ),
                     ),
                   ),
-                ],
-              ),
-            ),
-            
-            const SizedBox(height: 20),
-
-            // Aquatan sprite
-            SizedBox(
-              width: size,
-              height: size,
-              child: CustomPaint(
-                painter: AquatanPainter(
-                  image: _customAquatan!,
-                  frame: _currentFrame,
-                  pose: state.currentPose,
                 ),
               ),
-            ),
 
-            const SizedBox(height: 20),
+              const SizedBox(height: 16),
 
-            // Stats bars
-            _buildStatsBar(context, manager),
-
-            const SizedBox(height: 20),
-
-            // Action buttons
-            _buildActionButtons(petProvider),
-          ],
+              // Mood indicator
+              _buildMoodIndicator(state.mood),
+            ],
+          ),
         );
       },
     );
   }
 
-  Widget _buildStatsBar(BuildContext context, AquatanManager manager) {
+  Widget _buildGrowthStageBadge(AquatanGrowthStage stage) {
     return Container(
-      padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        gradient: LinearGradient(
+          colors: [
+            Colors.purple[400]!,
+            Colors.purple[600]!,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.purple.withOpacity(0.3),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Column(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          _buildStatRow('Health', manager.state.health, manager.healthColor),
-          const SizedBox(height: 8),
-          _buildStatRow('Energy', manager.state.energy, manager.energyColor),
-          const SizedBox(height: 8),
-          _buildStatRow('Happiness', manager.state.happiness, manager.happinessColor),
+          Icon(
+            _getStageIcon(stage),
+            color: Colors.white,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            stage.name.toUpperCase(),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              letterSpacing: 1.2,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildStatRow(String label, int value, Color color) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 80,
-          child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+  Widget _buildMoodIndicator(AquatanMood mood) {
+    final color = _getMoodColor(mood);
+    final icon = _getMoodIcon(mood);
+    final text = _getMoodText(mood);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withOpacity(0.3),
+          width: 2,
         ),
-        Expanded(
-          child: LinearProgressIndicator(
-            value: value / 100,
-            backgroundColor: Colors.grey[300],
-            valueColor: AlwaysStoppedAnimation<Color>(color),
-            minHeight: 8,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: color,
+            size: 24,
           ),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 30,
-          child: Text('$value', style: const TextStyle(fontWeight: FontWeight.bold)),
-        ),
-      ],
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildActionButtons(PetProvider petProvider) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        ElevatedButton.icon(
-          onPressed: () => petProvider.feed(),
-          icon: const Icon(Icons.restaurant),
-          label: const Text('Feed'),
-        ),
-        ElevatedButton.icon(
-          onPressed: () => petProvider.play(),
-          icon: const Icon(Icons.sports_esports),
-          label: const Text('Play'),
-        ),
-        ElevatedButton.icon(
-          onPressed: () => petProvider.rest(),
-          icon: const Icon(Icons.bed),
-          label: const Text('Rest'),
-        ),
-      ],
-    );
+  IconData _getStageIcon(AquatanGrowthStage stage) {
+    switch (stage) {
+      case AquatanGrowthStage.egg:
+        return Icons.egg;
+      case AquatanGrowthStage.baby:
+        return Icons.child_care;
+      case AquatanGrowthStage.child:
+        return Icons.face;
+      case AquatanGrowthStage.teen:
+        return Icons.sentiment_very_satisfied;
+      case AquatanGrowthStage.adult:
+        return Icons.star;
+      case AquatanGrowthStage.elder:
+        return Icons.workspace_premium;
+    }
+  }
+
+  IconData _getMoodIcon(AquatanMood mood) {
+    switch (mood) {
+      case AquatanMood.happy:
+        return Icons.sentiment_very_satisfied;
+      case AquatanMood.excited:
+        return Icons.celebration;
+      case AquatanMood.sad:
+        return Icons.sentiment_dissatisfied;
+      case AquatanMood.tired:
+        return Icons.battery_2_bar;
+      case AquatanMood.sick:
+        return Icons.sick;
+      case AquatanMood.sleeping:
+        return Icons.bedtime;
+    }
+  }
+
+  String _getMoodText(AquatanMood mood) {
+    switch (mood) {
+      case AquatanMood.happy:
+        return "Feeling great!";
+      case AquatanMood.excited:
+        return "Super excited!";
+      case AquatanMood.sad:
+        return "Feeling lonely...";
+      case AquatanMood.tired:
+        return "So tired...";
+      case AquatanMood.sick:
+        return "Not feeling well...";
+      case AquatanMood.sleeping:
+        return "Zzz...";
+    }
+  }
+
+  Color _getMoodColor(AquatanMood mood) {
+    switch (mood) {
+      case AquatanMood.happy:
+        return Colors.green;
+      case AquatanMood.excited:
+        return Colors.orange;
+      case AquatanMood.sad:
+        return Colors.blue;
+      case AquatanMood.tired:
+        return Colors.grey;
+      case AquatanMood.sick:
+        return Colors.red;
+      case AquatanMood.sleeping:
+        return Colors.indigo;
+    }
   }
 }
 
@@ -232,7 +358,9 @@ class AquatanPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    const spriteSize = 32.0;
+    const spriteSize = GameConstants.spriteSize;
+    
+    // Source rectangle from sprite sheet
     final srcRect = Rect.fromLTWH(
       frame * spriteSize,
       pose.row * spriteSize,
@@ -240,16 +368,21 @@ class AquatanPainter extends CustomPainter {
       spriteSize,
     );
 
+    // Destination rectangle (scaled to widget size)
     final dstRect = Rect.fromLTWH(0, 0, size.width, size.height);
     
+    // Paint with pixel-perfect rendering (no smoothing for pixel art)
     final paint = Paint()
-      ..filterQuality = FilterQuality.none;
+      ..filterQuality = FilterQuality.none
+      ..isAntiAlias = false;
 
     canvas.drawImageRect(image, srcRect, dstRect, paint);
   }
 
   @override
   bool shouldRepaint(AquatanPainter oldDelegate) {
-    return frame != oldDelegate.frame || pose != oldDelegate.pose;
+    return frame != oldDelegate.frame || 
+           pose != oldDelegate.pose ||
+           image != oldDelegate.image;
   }
 }

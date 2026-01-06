@@ -1,22 +1,24 @@
-import 'dart:convert';
-
 class Statistics {
   int totalCommits;
   int currentStreak;
   int longestStreak;
-  int totalPetInteractions;
+  int totalFeeds;
+  int totalPlays;
+  int totalRests;
   Map<String, int> commitsByDay;
-  DateTime firstCommitDate;
   DateTime? lastCommitDate;
+  DateTime createdAt;
 
   Statistics({
     required this.totalCommits,
     required this.currentStreak,
     required this.longestStreak,
-    required this.totalPetInteractions,
+    required this.totalFeeds,
+    required this.totalPlays,
+    required this.totalRests,
     required this.commitsByDay,
-    required this.firstCommitDate,
     this.lastCommitDate,
+    required this.createdAt,
   });
 
   factory Statistics.initial() {
@@ -24,7 +26,9 @@ class Statistics {
       totalCommits: 0,
       currentStreak: 0,
       longestStreak: 0,
-      totalPetInteractions: 0,
+      totalFeeds: 0,
+      totalPlays: 0,
+      totalRests: 0,
       commitsByDay: {
         'Mon': 0,
         'Tue': 0,
@@ -34,60 +38,35 @@ class Statistics {
         'Sat': 0,
         'Sun': 0,
       },
-      firstCommitDate: DateTime.now(),
+      createdAt: DateTime.now(),
     );
   }
 
-  // Add toJson method
-  Map<String, dynamic> toJson() {
-    return {
-      'totalCommits': totalCommits,
-      'currentStreak': currentStreak,
-      'longestStreak': longestStreak,
-      'totalPetInteractions': totalPetInteractions,
-      'commitsByDay': commitsByDay,
-      'firstCommitDate': firstCommitDate.toIso8601String(),
-      'lastCommitDate': lastCommitDate?.toIso8601String(),
-    };
-  }
+  int get totalPetInteractions => totalFeeds + totalPlays + totalRests;
 
-  // Add fromJson factory
-  factory Statistics.fromJson(Map<String, dynamic> json) {
-    return Statistics(
-      totalCommits: json['totalCommits'] ?? 0,
-      currentStreak: json['currentStreak'] ?? 0,
-      longestStreak: json['longestStreak'] ?? 0,
-      totalPetInteractions: json['totalPetInteractions'] ?? 0,
-      commitsByDay: Map<String, int>.from(json['commitsByDay'] ?? {}),
-      firstCommitDate: DateTime.parse(json['firstCommitDate']),
-      lastCommitDate: json['lastCommitDate'] != null
-          ? DateTime.parse(json['lastCommitDate'])
-          : null,
-    );
-  }
-
-  void incrementCommits() {
-    totalCommits++;
-    final now = DateTime.now();
-    final dayName = _getDayName(now.weekday);
-    commitsByDay[dayName] = (commitsByDay[dayName] ?? 0) + 1;
+  void recordCommits(int count, DateTime commitDate) {
+    totalCommits += count;
     
-    _updateStreak(now);
+    final dayName = _getDayName(commitDate.weekday);
+    commitsByDay[dayName] = (commitsByDay[dayName] ?? 0) + count;
+    
+    _updateStreak(commitDate);
   }
 
-  void incrementInteractions() {
-    totalPetInteractions++;
-  }
+  void recordFeed() => totalFeeds++;
+  void recordPlay() => totalPlays++;
+  void recordRest() => totalRests++;
 
-  void _updateStreak(DateTime now) {
+  void _updateStreak(DateTime commitDate) {
     if (lastCommitDate == null) {
       currentStreak = 1;
       longestStreak = 1;
     } else {
-      final difference = now.difference(lastCommitDate!).inDays;
-      if (difference == 0) {
-        // Same day, keep streak
-      } else if (difference == 1) {
+      final daysDifference = commitDate.difference(lastCommitDate!).inDays;
+      
+      if (daysDifference == 0) {
+        // Same day - keep streak
+      } else if (daysDifference == 1) {
         // Consecutive day
         currentStreak++;
         if (currentStreak > longestStreak) {
@@ -98,11 +77,41 @@ class Statistics {
         currentStreak = 1;
       }
     }
-    lastCommitDate = now;
+    lastCommitDate = commitDate;
   }
 
   String _getDayName(int weekday) {
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     return days[weekday - 1];
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'totalCommits': totalCommits,
+      'currentStreak': currentStreak,
+      'longestStreak': longestStreak,
+      'totalFeeds': totalFeeds,
+      'totalPlays': totalPlays,
+      'totalRests': totalRests,
+      'commitsByDay': commitsByDay,
+      'lastCommitDate': lastCommitDate?.toIso8601String(),
+      'createdAt': createdAt.toIso8601String(),
+    };
+  }
+
+  factory Statistics.fromJson(Map<String, dynamic> json) {
+    return Statistics(
+      totalCommits: json['totalCommits'] ?? 0,
+      currentStreak: json['currentStreak'] ?? 0,
+      longestStreak: json['longestStreak'] ?? 0,
+      totalFeeds: json['totalFeeds'] ?? 0,
+      totalPlays: json['totalPlays'] ?? 0,
+      totalRests: json['totalRests'] ?? 0,
+      commitsByDay: Map<String, int>.from(json['commitsByDay'] ?? {}),
+      lastCommitDate: json['lastCommitDate'] != null
+          ? DateTime.parse(json['lastCommitDate'])
+          : null,
+      createdAt: DateTime.parse(json['createdAt'] ?? DateTime.now().toIso8601String()),
+    );
   }
 }

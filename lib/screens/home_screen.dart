@@ -3,12 +3,11 @@ import 'package:provider/provider.dart';
 import '../models/user_settings.dart';
 import '../services/github_service.dart';
 import '../services/storage_service.dart';
-import '../services/statistics_service.dart';
 import '../widgets/pet_widget.dart';
 import '../providers/pet_provider.dart';
-import '../utils/constants.dart';
+import '../utils/game_constants.dart';
+import '../services/stat_calculator.dart';
 import 'statistics_screen.dart';
-import '../models/statistics.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -18,11 +17,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  late UserSettings _settings;
+  UserSettings? _settings;
   final GitHubService _githubService = GitHubService();
   final StorageService _storageService = StorageService();
-  final StatisticsService _statisticsService = StatisticsService();
-  late Statistics _statistics;
 
   bool _isLoading = false;
   String _statusMessage = '';
@@ -40,23 +37,23 @@ class _HomeScreenState extends State<HomeScreen> {
         _isLoading = true;
       });
 
-      // Load saved data
+      // Load saved settings
       _settings = await _storageService.loadSettings();
-      _statistics = await _statisticsService.loadStatistics();
 
       // Configure GitHub service if configured
-      if (_settings.isConfigured) {
-        _githubService.setCredentials(_settings.githubUsername!, _settings.githubToken);
-        
-        // Initialize pet provider with username
-        if (mounted) {
-          await context.read<PetProvider>().initialize(_settings.githubUsername!);
-        }
-      } else {
-        // Initialize with a default username if not configured
-        if (mounted) {
-          await context.read<PetProvider>().initialize('guest');
-        }
+      if (_settings!.isConfigured) {
+        _githubService.setCredentials(
+          _settings!.githubUsername!,
+          _settings!.githubToken,
+        );
+      }
+
+      // Initialize pet provider
+      if (mounted) {
+        final username = _settings!.isConfigured 
+            ? _settings!.githubUsername! 
+            : 'guest';
+        await context.read<PetProvider>().initialize(username);
       }
 
       if (mounted) {
@@ -77,8 +74,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _fetchAndFeed() async {
-    if (!_settings.isConfigured) {
+  Future<void> _fetchAndFeedFromGitHub() async {
+    if (_settings == null || !_settings!.isConfigured) {
       _showSettingsDialog();
       return;
     }
@@ -92,23 +89,26 @@ class _HomeScreenState extends State<HomeScreen> {
       final stats = await _githubService.fetchRecentCommits(days: 7);
       
       final newCommits = stats.recentCommits
-          .where((commit) => !_settings.usedCommitShas.contains(commit.sha))
+          .where((commit) => !_settings!.usedCommitShas.contains(commit.sha))
           .toList();
       
       final newCommitCount = newCommits.length;
 
       if (newCommitCount > 0) {
-        // Update pet through provider
-        context.read<PetProvider>().onCommit(newCommitCount);
-        
-        // Update statistics
-        for (int i = 0; i < newCommitCount; i++) {
-          _statistics.incrementCommits();
+        // Feed pet through provider
+        if (mounted) {
+          await context.read<PetProvider>().onCommit(
+            newCommitCount,
+            commitDate: newCommits.first.date,
+          );
         }
         
+        // Mark commits as used
         for (var commit in newCommits) {
-          _settings.usedCommitShas.add(commit.sha);
+          _settings!.usedCommitShas.add(commit.sha);
         }
+        
+        await _storageService.saveSettings(_settings!);
         
         setState(() {
           _statusMessage = '🎉 Fed with $newCommitCount new commit${newCommitCount > 1 ? 's' : ''}!';
@@ -131,10 +131,6 @@ class _HomeScreenState extends State<HomeScreen> {
           }
         });
       }
-
-      await _storageService.saveSettings(_settings);
-      await _statisticsService.saveStatistics(_statistics);
-      await _storageService.saveLastUpdate(DateTime.now());
     } catch (e) {
       setState(() {
         _statusMessage = '❌ Error: ${e.toString()}';
@@ -146,9 +142,39 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _playWithPet() async {
+    final petProvider = context.read<PetProvider>();
+    if (petProvider.state != null && petProvider.state!.energy < 15) {
+      setState(() {
+        _statusMessage = '😴 Too tired to play! Let your pet rest first.';
+      });
+      return;
+    }
+
+    if (mounted) {
+      await context.read<PetProvider>().play();
+      setState(() {
+        _statusMessage = '🎮 Played with your pet! Happiness increased!';
+      });
+    }
+  }
+
+  Future<void> _letPetRest() async {
+    if (mounted) {
+      await context.read<PetProvider>().rest();
+      setState(() {
+        _statusMessage = '😴 Your pet is resting... Energy restored!';
+      });
+    }
+  }
+
   void _showSettingsDialog() {
-    final usernameController = TextEditingController(text: _settings.githubUsername);
-    final tokenController = TextEditingController(text: _settings.githubToken);
+    final usernameController = TextEditingController(
+      text: _settings?.githubUsername,
+    );
+    final tokenController = TextEditingController(
+      text: _settings?.githubToken,
+    );
 
     showDialog(
       context: context,
@@ -160,7 +186,7 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Configure your GitHub account to start feeding your pet!',
+                'Configure your GitHub account to start feeding your pet with commits!',
                 style: TextStyle(fontSize: 12),
               ),
               const SizedBox(height: 16),
@@ -170,6 +196,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   labelText: 'GitHub Username',
                   hintText: 'octocat',
                   border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.person),
                 ),
               ),
               const SizedBox(height: 16),
@@ -179,13 +206,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   labelText: 'Personal Access Token (optional)',
                   hintText: 'ghp_...',
                   border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.key),
                   helperText: 'Increases API rate limits',
                 ),
                 obscureText: true,
               ),
               const SizedBox(height: 8),
               Text(
-                'Create token at: github.com/settings/tokens',
+                'Create token at: github.com/settings/tokens\nNo special permissions needed.',
                 style: TextStyle(
                   fontSize: 10,
                   color: Colors.grey[600],
@@ -211,11 +239,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 return;
               }
 
-              _settings.githubUsername = username;
-              _settings.githubToken = token.isEmpty ? null : token;
+              _settings ??= UserSettings();
+              _settings!.githubUsername = username;
+              _settings!.githubToken = token.isEmpty ? null : token;
               
               _githubService.setCredentials(username, token.isEmpty ? null : token);
-              await _storageService.saveSettings(_settings);
+              await _storageService.saveSettings(_settings!);
 
               // Re-initialize pet with new username
               if (mounted) {
@@ -250,9 +279,11 @@ class _HomeScreenState extends State<HomeScreen> {
           ElevatedButton(
             onPressed: () async {
               setState(() {
-                _settings.usedCommitShas.clear();
+                _settings?.usedCommitShas.clear();
               });
-              await _storageService.saveSettings(_settings);
+              if (_settings != null) {
+                await _storageService.saveSettings(_settings!);
+              }
               
               if (mounted) {
                 Navigator.pop(context);
@@ -269,6 +300,18 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+
+  void _navigateToStatistics() {
+    final statistics = context.read<PetProvider>().statistics;
+    if (statistics != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => StatisticsScreen(statistics: statistics),
+        ),
+      );
+    }
   }
 
   @override
@@ -293,22 +336,17 @@ class _HomeScreenState extends State<HomeScreen> {
         title: Consumer<PetProvider>(
           builder: (context, petProvider, child) {
             final state = petProvider.state;
-            return Text('${AppConstants.appName}${state != null ? ' - Stage: ${state.growthStage.name}' : ''}');
+            return Text(
+              'TamaGit${state != null ? ' - ${state.growthStage.name.toUpperCase()}' : ''}',
+            );
           },
         ),
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
           IconButton(
             icon: const Icon(Icons.bar_chart),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => StatisticsScreen(
-                    statistics: _statistics,
-                  ),
-                ),
-              );
-            },
+            onPressed: _navigateToStatistics,
+            tooltip: 'Statistics',
           ),
           PopupMenuButton<String>(
             onSelected: (value) {
@@ -344,7 +382,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppConstants.defaultPadding),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
             // Pet Display
@@ -352,7 +390,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 24),
 
-            // Pet Info
+            // Pet Stats Card
             Consumer<PetProvider>(
               builder: (context, petProvider, child) {
                 final state = petProvider.state;
@@ -366,31 +404,78 @@ class _HomeScreenState extends State<HomeScreen> {
                 }
 
                 return Card(
+                  elevation: 4,
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
                       children: [
-                        Text(
-                          'Stage: ${state.growthStage.name.toUpperCase()}',
-                          style: Theme.of(context).textTheme.titleLarge,
+                        // Mood indicator
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              StatCalculator.getMoodIcon(state.mood),
+                              size: 32,
+                              color: Colors.amber,
+                            ),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                StatCalculator.getStatusMessage(state.mood),
+                                style: Theme.of(context).textTheme.bodyMedium,
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ],
+                        ),
+                        
+                        const Divider(height: 24),
+                        
+                        // Stats bars
+                        _buildStatBar(
+                          'Health',
+                          state.health,
+                          Icons.favorite,
+                          StatCalculator.getStatColor(state.health),
                         ),
                         const SizedBox(height: 8),
-                        Text(
-                          'Total Commits: ${state.totalCommits}',
-                          style: Theme.of(context).textTheme.bodyLarge,
+                        _buildStatBar(
+                          'Happiness',
+                          state.happiness,
+                          Icons.sentiment_satisfied,
+                          StatCalculator.getStatColor(state.happiness),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Age: ${state.age} days',
-                          style: Theme.of(context).textTheme.bodyMedium,
+                        const SizedBox(height: 8),
+                        _buildStatBar(
+                          'Energy',
+                          state.energy,
+                          Icons.battery_charging_full,
+                          StatCalculator.getStatColor(state.energy),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Streak: ${state.commitStreak} days',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: state.commitStreak > 7 ? Colors.green : null,
-                            fontWeight: state.commitStreak > 7 ? FontWeight.bold : null,
-                          ),
+                        
+                        const Divider(height: 24),
+                        
+                        // Growth info
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            _buildInfoChip(
+                              'Commits',
+                              state.totalCommits.toString(),
+                              Icons.commit,
+                            ),
+                            _buildInfoChip(
+                              'Age',
+                              '${state.age} days',
+                              Icons.cake,
+                            ),
+                            _buildInfoChip(
+                              'Streak',
+                              '${state.commitStreak} 🔥',
+                              Icons.local_fire_department,
+                              highlight: state.commitStreak > 7,
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -407,35 +492,80 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: Colors.blue[50],
                 child: Padding(
                   padding: const EdgeInsets.all(12.0),
-                  child: Text(
-                    _statusMessage,
-                    style: const TextStyle(fontSize: 14),
-                    textAlign: TextAlign.center,
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, color: Colors.blue),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _statusMessage,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
 
             const SizedBox(height: 16),
 
-            // Feed Button
+            // Action Buttons (Play and Rest only)
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _isLoading ? null : _playWithPet,
+                    icon: const Icon(Icons.sports_esports),
+                    label: const Text('Play'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.purple,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _isLoading ? null : _letPetRest,
+                    icon: const Icon(Icons.bedtime),
+                    label: const Text('Rest'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.indigo,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // GitHub Feed Button (Main feeding mechanic)
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton.icon(
-                onPressed: _isLoading ? null : _fetchAndFeed,
+                onPressed: _isLoading ? null : _fetchAndFeedFromGitHub,
                 icon: _isLoading
                     ? const SizedBox(
                         width: 20,
                         height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
-                    : const Icon(Icons.restaurant),
+                    : const Icon(Icons.cloud_download),
                 label: Text(
-                  _settings.isConfigured ? 'Feed from GitHub' : 'Configure GitHub',
-                  style: const TextStyle(fontSize: 16),
+                  _settings?.isConfigured == true 
+                      ? 'Feed from GitHub Commits' 
+                      : 'Configure GitHub',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppConstants.happyColor,
+                  backgroundColor: Colors.orange,
                   foregroundColor: Colors.white,
                 ),
               ),
@@ -444,15 +574,74 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 8),
 
             // Helper text
-            if (!_settings.isConfigured)
+            if (_settings?.isConfigured != true)
               const Text(
-                'Tap the button above to set up your GitHub account',
+                'Tap the button above to set up your GitHub account\nand start feeding your pet with commits!',
                 style: TextStyle(fontSize: 12, color: Colors.grey),
                 textAlign: TextAlign.center,
               ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildStatBar(String label, int value, IconData icon, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+            const Spacer(),
+            Text(
+              '$value / ${GameConstants.maxStat}',
+              style: TextStyle(fontSize: 12, color: color),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        LinearProgressIndicator(
+          value: value / GameConstants.maxStat,
+          backgroundColor: Colors.grey[300],
+          valueColor: AlwaysStoppedAnimation<Color>(color),
+          minHeight: 8,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInfoChip(
+    String label,
+    String value,
+    IconData icon, {
+    bool highlight = false,
+  }) {
+    return Chip(
+      avatar: Icon(icon, size: 16),
+      label: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(fontSize: 10),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: highlight ? Colors.orange : null,
+            ),
+          ),
+        ],
+      ),
+      backgroundColor: highlight ? Colors.orange[50] : null,
     );
   }
 }

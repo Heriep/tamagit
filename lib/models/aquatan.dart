@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/pet_stats.dart';
 
 enum AquatanMood {
   happy,
@@ -38,9 +39,7 @@ enum AquatanPose {
 }
 
 class AquatanState {
-  final int health;
-  final int happiness;
-  final int energy;
+  final PetStats stats;
   final int age;
   final AquatanMood mood;
   final AquatanGrowthStage growthStage;
@@ -48,13 +47,13 @@ class AquatanState {
   final Map<String, Color> colors;
   final DateTime lastFed;
   final DateTime lastPlayed;
+  final DateTime lastRested;
   final int totalCommits;
   final int commitStreak;
+  final DateTime createdAt;
 
   AquatanState({
-    required this.health,
-    required this.happiness,
-    required this.energy,
+    required this.stats,
     required this.age,
     required this.mood,
     required this.growthStage,
@@ -62,31 +61,36 @@ class AquatanState {
     required this.colors,
     required this.lastFed,
     required this.lastPlayed,
+    required this.lastRested,
     required this.totalCommits,
     required this.commitStreak,
+    required this.createdAt,
   });
 
   factory AquatanState.initial(Map<String, Color> colors) {
+    final now = DateTime.now();
     return AquatanState(
-      health: 100,
-      happiness: 100,
-      energy: 100,
+      stats: PetStats.initial(),
       age: 0,
       mood: AquatanMood.happy,
       growthStage: AquatanGrowthStage.egg,
       currentPose: AquatanPose.idle,
       colors: colors,
-      lastFed: DateTime.now(),
-      lastPlayed: DateTime.now(),
+      lastFed: now,
+      lastPlayed: now,
+      lastRested: now,
       totalCommits: 0,
       commitStreak: 0,
+      createdAt: now,
     );
   }
 
+  int get health => stats.health;
+  int get happiness => stats.happiness;
+  int get energy => stats.energy;
+
   AquatanState copyWith({
-    int? health,
-    int? happiness,
-    int? energy,
+    PetStats? stats,
     int? age,
     AquatanMood? mood,
     AquatanGrowthStage? growthStage,
@@ -94,13 +98,13 @@ class AquatanState {
     Map<String, Color>? colors,
     DateTime? lastFed,
     DateTime? lastPlayed,
+    DateTime? lastRested,
     int? totalCommits,
     int? commitStreak,
+    DateTime? createdAt,
   }) {
     return AquatanState(
-      health: health ?? this.health,
-      happiness: happiness ?? this.happiness,
-      energy: energy ?? this.energy,
+      stats: stats ?? this.stats,
       age: age ?? this.age,
       mood: mood ?? this.mood,
       growthStage: growthStage ?? this.growthStage,
@@ -108,16 +112,16 @@ class AquatanState {
       colors: colors ?? this.colors,
       lastFed: lastFed ?? this.lastFed,
       lastPlayed: lastPlayed ?? this.lastPlayed,
+      lastRested: lastRested ?? this.lastRested,
       totalCommits: totalCommits ?? this.totalCommits,
       commitStreak: commitStreak ?? this.commitStreak,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'health': health,
-      'happiness': happiness,
-      'energy': energy,
+      'stats': stats.toJson(),
       'age': age,
       'mood': mood.name,
       'growthStage': growthStage.name,
@@ -125,27 +129,38 @@ class AquatanState {
       'colors': colors.map((k, v) => MapEntry(k, v.value)),
       'lastFed': lastFed.toIso8601String(),
       'lastPlayed': lastPlayed.toIso8601String(),
+      'lastRested': lastRested.toIso8601String(),
       'totalCommits': totalCommits,
       'commitStreak': commitStreak,
+      'createdAt': createdAt.toIso8601String(),
     };
   }
 
   factory AquatanState.fromJson(Map<String, dynamic> json) {
     return AquatanState(
-      health: json['health'] as int,
-      happiness: json['happiness'] as int,
-      energy: json['energy'] as int,
-      age: json['age'] as int,
-      mood: AquatanMood.values.firstWhere((e) => e.name == json['mood']),
-      growthStage: AquatanGrowthStage.values.firstWhere((e) => e.name == json['growthStage']),
-      currentPose: AquatanPose.values.firstWhere((e) => e.name == json['currentPose']),
-      colors: (json['colors'] as Map<String, dynamic>).map(
-        (k, v) => MapEntry(k, Color(v as int)),
+      stats: PetStats.fromJson(json['stats'] ?? {}),
+      age: json['age'] as int? ?? 0,
+      mood: AquatanMood.values.firstWhere(
+        (e) => e.name == json['mood'],
+        orElse: () => AquatanMood.happy,
       ),
-      lastFed: DateTime.parse(json['lastFed'] as String),
-      lastPlayed: DateTime.parse(json['lastPlayed'] as String),
-      totalCommits: json['totalCommits'] as int,
-      commitStreak: json['commitStreak'] as int,
+      growthStage: AquatanGrowthStage.values.firstWhere(
+        (e) => e.name == json['growthStage'],
+        orElse: () => AquatanGrowthStage.egg,
+      ),
+      currentPose: AquatanPose.values.firstWhere(
+        (e) => e.name == json['currentPose'],
+        orElse: () => AquatanPose.idle,
+      ),
+      colors: (json['colors'] as Map<String, dynamic>?)?.map(
+        (k, v) => MapEntry(k, Color(v as int)),
+      ) ?? {},
+      lastFed: DateTime.parse(json['lastFed'] as String? ?? DateTime.now().toIso8601String()),
+      lastPlayed: DateTime.parse(json['lastPlayed'] as String? ?? DateTime.now().toIso8601String()),
+      lastRested: DateTime.parse(json['lastRested'] as String? ?? DateTime.now().toIso8601String()),
+      totalCommits: json['totalCommits'] as int? ?? 0,
+      commitStreak: json['commitStreak'] as int? ?? 0,
+      createdAt: DateTime.parse(json['createdAt'] as String? ?? DateTime.now().toIso8601String()),
     );
   }
 }

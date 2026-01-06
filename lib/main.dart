@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'screens/home_screen.dart';
 import 'providers/pet_provider.dart';
 import 'services/storage_service.dart';
+import 'services/statistics_service.dart';
 
 void main() {
   runApp(const MyApp());
@@ -16,7 +17,10 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
-          create: (_) => PetProvider(StorageService()),
+          create: (_) => PetProvider(
+            StorageService(),
+            StatisticsService(),
+          ),
         ),
       ],
       child: MaterialApp(
