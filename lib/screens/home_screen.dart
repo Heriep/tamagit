@@ -9,6 +9,7 @@ import '../utils/game_constants.dart';
 import '../services/stat_calculator.dart';
 import 'statistics_screen.dart';
 import 'debug_screen.dart';
+import '../widgets/garden_environment.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -395,24 +396,19 @@ class _HomeScreenState extends State<HomeScreen> {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Pet Display
-            const PetWidget(),
+            // Garden Environment
+            const GardenEnvironment(),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
 
-            // Pet Stats Card
+            // Pet info card (outside the garden)
             Consumer<PetProvider>(
               builder: (context, petProvider, child) {
                 final state = petProvider.state;
-                if (state == null) {
-                  return const Card(
-                    child: Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Text('Configure GitHub to get started'),
-                    ),
-                  );
-                }
+                
+                if (state == null) return const SizedBox.shrink();
 
                 return Card(
                   elevation: 4,
@@ -420,69 +416,48 @@ class _HomeScreenState extends State<HomeScreen> {
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
                       children: [
+                        // Growth stage badge
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [Colors.purple[400]!, Colors.purple[600]!],
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            state.growthStage.name.toUpperCase(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
+
                         // Mood indicator
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              StatCalculator.getMoodIcon(state.mood),
-                              size: 32,
-                              color: Colors.amber,
-                            ),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                StatCalculator.getStatusMessage(state.mood),
-                                style: Theme.of(context).textTheme.bodyMedium,
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ],
-                        ),
-                        
+                        _buildMoodIndicator(state.mood),
+
+                        const SizedBox(height: 16),
+
+                        // Stats
+                        _buildStatBar('Health', state.health, Icons.favorite, Colors.red),
+                        _buildStatBar('Happiness', state.happiness, Icons.sentiment_satisfied, Colors.amber),
+                        _buildStatBar('Energy', state.energy, Icons.battery_charging_full, Colors.green),
+
                         const Divider(height: 24),
-                        
-                        // Stats bars
-                        _buildStatBar(
-                          'Health',
-                          state.health,
-                          Icons.favorite,
-                          StatCalculator.getStatColor(state.health),
-                        ),
-                        const SizedBox(height: 8),
-                        _buildStatBar(
-                          'Happiness',
-                          state.happiness,
-                          Icons.sentiment_satisfied,
-                          StatCalculator.getStatColor(state.happiness),
-                        ),
-                        const SizedBox(height: 8),
-                        _buildStatBar(
-                          'Energy',
-                          state.energy,
-                          Icons.battery_charging_full,
-                          StatCalculator.getStatColor(state.energy),
-                        ),
-                        
-                        const Divider(height: 24),
-                        
+
                         // Growth info
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
-                            _buildInfoChip(
-                              'Commits',
-                              state.totalCommits.toString(),
-                              Icons.commit,
-                            ),
-                            _buildInfoChip(
-                              'Age',
-                              '${state.age} days',
-                              Icons.cake,
-                            ),
+                            _buildInfoChip('Commits', state.totalCommits.toString(), Icons.commit),
+                            const SizedBox(width: 4),
+                            _buildInfoChip('Age', '${state.age}d', Icons.cake),
+                            const SizedBox(width: 4),
                             _buildInfoChip(
                               'Streak',
-                              '${state.commitStreak} 🔥',
+                              '${state.commitStreak}🔥',
                               Icons.local_fire_department,
                               highlight: state.commitStreak > 7,
                             ),
@@ -660,6 +635,27 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
+    );
+  }
+
+  Widget _buildMoodIndicator(dynamic mood) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(
+          StatCalculator.getMoodIcon(mood),
+          size: 32,
+          color: Colors.amber,
+        ),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            StatCalculator.getStatusMessage(mood),
+            style: Theme.of(context).textTheme.bodyMedium,
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ],
     );
   }
 }

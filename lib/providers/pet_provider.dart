@@ -98,6 +98,15 @@ class PetProvider extends ChangeNotifier {
     }
   }
 
+  /// Direct state update (bypasses manager, used for UI-driven changes like garden movement)
+  void setState(AquatanState newState) async {
+    if (_aquatanManager != null) {
+      _aquatanManager!.debugUpdateState(newState);
+      await _storageService.saveAquatanState(newState);
+      notifyListeners();
+    }
+  }
+
   @override
   void dispose() {
     _aquatanManager?.dispose();
