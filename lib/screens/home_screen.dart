@@ -337,13 +337,15 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: Consumer<PetProvider>(
           builder: (context, petProvider, child) {
-            final state = petProvider.state;
-            return Text(
-              'TamaGit${state != null ? ' - ${state.growthStage.name.toUpperCase()}' : ''}',
-            );
+            return const Text('TamaGit');
           },
         ),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            bottom: Radius.circular(16),
+          ),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.bug_report),
