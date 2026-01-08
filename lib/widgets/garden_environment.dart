@@ -159,16 +159,23 @@ class _GardenEnvironmentState extends State<GardenEnvironment> with SingleTicker
                       animation: _movementController,
                       builder: (context, child) {
                         final currentPos = Offset.lerp(_petPosition, _targetPosition, _movementController.value)!;
+                        final displaySize = GameConstants.basePetSize * state.growthStage.size;
+                        
+                        // Scale shadow based on Aquatan's size
+                        final shadowWidth = displaySize * 0.8;
+                        final shadowHeight = displaySize * 0.25;
+                        // Shadow offset below the sprite
+                        final shadowYOffset = displaySize * 0.4;
                         
                         return Positioned(
-                          left: constraints.maxWidth * currentPos.dx - 30,
-                          top: constraints.maxHeight * currentPos.dy + 30,
+                          left: constraints.maxWidth * currentPos.dx - shadowWidth / 2,
+                          top: constraints.maxHeight * currentPos.dy + shadowYOffset,
                           child: Container(
-                            width: 60,
-                            height: 20,
+                            width: shadowWidth,
+                            height: shadowHeight,
                             decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(30),
+                              color: Colors.black.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(shadowWidth / 2),
                             ),
                           ),
                         );
