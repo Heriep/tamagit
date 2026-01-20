@@ -1,100 +1,95 @@
 # TamaGit
 
-A Flutter-based Tamagotchi-style pet game integrated with GitHub workflows.
+A Flutter-based Tamagotchi-style pet game driven by your GitHub activity.
 
 ## Overview
 
-TamaGit is a gamified application that turns your GitHub activity into a virtual pet care experience. Your commit frequency, code quality, and repository engagement directly affect your digital pet's health and happiness.
+TamaGit turns your development routine into a pet-care loop: commits and repository activity help your Aquatan grow, while inactivity makes it lose stats. The app connects to GitHub, fetches statistics for selected repositories, and maps them to a simple health/happiness/energy system.
 
-## Features
+## Key Features
 
-- **Virtual Pet**: A digital companion that responds to your GitHub activity
-- **GitHub Integration**: Automatically tracks your commits, pull requests, and repository interactions via GitHub API
-- **Health & Mood System**: Pet's wellbeing and emotional state depend on regular code contributions
-- **Statistics Dashboard**: Comprehensive view of your coding patterns and pet's development
-- **Visual Feedback**: Watch your pet grow and evolve based on your development habits
-- **Persistent Storage**: Your pet's state and statistics are saved locally
-- **Customizable Settings**: Configure GitHub repositories and application preferences
-- **Cross-platform**: Built with Flutter for iOS, Android, and desktop support
+- **Aquatan pet** with growth stages and moods
+- **GitHub integration** (token-based) to fetch repository activity and stats
+- **Stats system** (health, happiness, energy) influenced by your coding activity
+- **Streak + progression** tracked over time
+- **Garden view** where the sprite can move around freely (UI environment)
+- **Statistics dashboard** to visualize activity
+- **Persistent storage** of settings and pet state
+- **Cross-platform** Flutter app (Android/iOS/Desktop)
 
 ## Getting Started
 
 ### Prerequisites
 
-- Flutter SDK (3.0 or higher)
+- Flutter SDK
 - Dart SDK
-- GitHub account and personal access token
+- A GitHub account
+- A GitHub Personal Access Token (PAT)
 
 ### Installation
 
-1. Clone the repository:
 ```bash
 git clone https://github.com/Heriep/tamagit.git
 cd tamagit
-```
-
-2. Install dependencies:
-```bash
 flutter pub get
-```
-
-3. Run the app:
-```bash
 flutter run
 ```
 
 ## How It Works
 
-1. **Connect Your GitHub Account**: Link TamaGit to your GitHub account using a personal access token
-2. **Select Repositories**: Choose which repositories to track
-3. **Make Commits**: Regular commits keep your pet healthy and happy
-4. **Monitor Statistics**: View detailed insights about your coding activity and pet's health
-5. **Watch It Grow**: Your pet evolves based on your coding patterns
-6. **Stay Consistent**: Maintain streaks for special rewards and achievements
+1. **Configure GitHub**: Add a GitHub Personal Access Token in the app settings.
+2. **Select repositories**: Choose which repositories you want TamaGit to track.
+3. **Code normally**: Your activity is translated into stats and progression.
+4. **Watch the pet evolve**: Growth stages and mood reflect your consistency.
 
 ## Project Structure
 
 ```
 lib/
-├── main.dart              # Application entry point
-├── config/               # Application configuration
-│   └── app_config.dart
-├── models/               # Data models
-│   ├── github_stats.dart
-│   ├── pet.dart
-│   ├── statistics.dart
-│   └── user_settings.dart
-├── providers/            # State management
-│   ├── github_provider.dart
-│   └── pet_provider.dart
-├── screens/              # UI screens
-│   ├── home_screen.dart
-│   ├── settings_screen.dart
-│   ├── statistics_screen.dart
-│   └── stats_screen.dart
-├── services/             # Business logic & integrations
-│   ├── github_service.dart
-│   ├── pet_manager.dart
-│   ├── statistics_service.dart
-│   └── storage_service.dart
-├── utils/                # Helper functions
-│   ├── constants.dart
-│   └── date_helpers.dart
-└── widgets/              # Reusable widgets
-    ├── mood_indicator.dart
-    ├── pet_widget.dart
-    └── stats_card.dart
+├── main.dart                          # App entry point (providers, MaterialApp)
+├── models/                            # Data models
+│   ├── aquatan.dart                   # Aquatan state, enums (mood/stage/pose), etc.
+│   ├── github_stats.dart              # GitHub related statistics DTOs
+│   ├── pet_stats.dart                 # Computed pet stats/progression helpers
+│   ├── statistics.dart                # App statistics model(s)
+│   └── user_settings.dart             # Stored settings (PAT, selected repos, ...)
+├── providers/                         # State management
+│   └── pet_provider.dart              # Single source-of-truth for pet state in UI
+├── screens/                           # UI screens
+│   ├── debug_screen.dart              # Debug controls/presets (dev only)
+│   ├── home_screen.dart               # Main screen (garden + pet info)
+│   └── statistics_screen.dart         # Stats visualisation screen
+├── services/                          # Business logic & integrations
+│   ├── aquatan_manager.dart           # Rules engine (decay, mood/stage calc, etc.)
+│   ├── github_service.dart            # GitHub API calls
+│   ├── stat_calculator.dart           # Stateless formulas (mood/pose/stage/bonuses)
+│   ├── statistics_service.dart        # Aggregation / formatting / higher-level stats
+│   └── storage_service.dart           # Persistence (settings + pet state)
+├── utils/                             # Pure helpers & constants
+│   ├── aquatan_generator.dart         # Sprite recolor / palette generation
+│   └── game_constants.dart            # Tunable gameplay constants
+└── widgets/                           # Reusable UI components
+    ├── aquatan_sprite.dart            # Pure sprite renderer (frame + pose)
+    ├── garden_environment.dart        # Garden container + free movement
+    └── pet_widget.dart                # Pet UI component (used outside garden if needed)
 ```
 
-## Configuration
+## Configuration (GitHub Token)
 
-To connect your GitHub account, you'll need to:
+You’ll need a GitHub Personal Access Token.
 
-1. Generate a GitHub personal access token with `repo` scope
-2. Configure it in the app's settings screen
+- Create a PAT in GitHub settings.
+- Paste it in the app **Settings** screen.
+
+Recommended: grant only the scopes required by the requests you make (for public repos, no `repo` scope is needed; for private repos, `repo` may be required).
+
+## Notes
+
+- API rate limits apply (GitHub).
+- The exact stat formulas are defined in the services/manager logic and may evolve as gameplay is tuned.
 
 ## Acknowledgments
 
-- Inspired by the classic Tamagotchi virtual pets
-- Built with Flutter framework
-- GitHub API integration for activity tracking
+- Inspired by classic Tamagotchi virtual pets
+- Built with Flutter
+- Uses GitHub APIs for activity tracking
